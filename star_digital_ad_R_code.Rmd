@@ -1,0 +1,257 @@
+---
+title: "Assignment 2"
+author: "Joyce Wu(5897736) & Yen-Chen Hsu(5897444)"
+date: "2023-10-01"
+output: pdf_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Maximizing ROI: A Comprehensive Analysis of Effective Advertising Strategy for Star Digital
+
+This is an analysis to measure causal effect of display advertising on
+sales conversion. We are interesting in finding out both a) is the
+advertising effective and b) which site(s) should Star Digital advertise
+on if it is in fact effective.
+
+In our analysis, we examined two key aspects: the impact of advertising
+on the likelihood of purchase and the cost-effective channel of our
+advertising sites. Our analysis demonstrates that increasing the
+frequency of advertising impression positively affect probability of
+purchase. Additionally, the data suggests that Site 6 is the preferred
+platform for advertising due to its potential of delivering a higher
+ROI. These insights should guide Star Digital in optimizing its display
+advertising strategy to improve effectiveness and return on investment.
+
+```{r}
+library(dplyr)
+library(readxl)
+library(ggplot2)
+```
+
+### Analysis Detail
+
+#### Loading data set for analysis
+
+```{r}
+#star<-read_excel("/Users/joycewu/Library/CloudStorage/GoogleDrive-wu001370@umn.edu/My Drive/Fall/Inference/Assignment 2/Star Digital Dataset.xls", na="NA", col_names = TRUE)
+```
+
+1.  Descriptive Statistic:
+
+    First, let's look at the structure and summary of the data:
+
+```{r}
+print(summary(star))
+print(str(star))
+```
+
+In order to understand more about the distribution of 6 websites from
+the experiment, we plot out the IQR plot for each website.
+
+```{r}
+#imp_1~imp_6 stands for the number of ad impression for either Star Digital or charity
+Q1 <- apply(star[, 4:9], 2, quantile, probs=0.25)
+Q3 <- apply(star[, 4:9], 2, quantile, probs=0.75)
+IQR_values <- Q3 - Q1
+
+# Identify potential outliers
+lower_bound <- Q1 - 1.5 * IQR_values
+upper_bound <- Q3 + 1.5 * IQR_values
+
+# Create box plots for imp_1 to imp_6
+par(mfrow=c(2, 3))  # Set up a 2x3 grid for multiple box plots
+for (i in 4:9) {
+  boxplot(star[, i], main=paste("Box Plot of", colnames(star)[i]), outline=FALSE)
+}
+```
+
+```{r}
+# Create box plot for imp_1 to imp_6
+boxplot(star[, 4:9], main="Boxplots of imp_1 to imp_6")
+```
+
+From above plots, we observed that the variables 'imp_2' and 'imp_6'
+displayed a notably higher number of outliers compared to the other
+websites. If possible, management team should also dive in the nature of
+these outliers in website 2 & 6, to find out what causes more impression
+to happen on these sites.
+
+Then, we proceed to assess the result of the experiment. The measurable
+objective in the data set will be "purchase", hence, we would calculate
+the ad impression to purchase rate and unique user purchase rate.
+
+```{r}
+star = star %>% mutate(total_imp = imp_1+imp_2+imp_3+imp_4+imp_5+imp_6)
+
+#unique ID to purchase rate
+purchase_count <- sum(star$purchase == 1)
+total_records <- nrow(star)
+purchase_rate_uuid <- purchase_count/total_records
+cat("purchase per unique ID: ", purchase_rate_uuid)
+```
+
+```{r}
+#impression-to-purchase rate
+impression_to_purchase_rate <- purchase_count / sum(star$total_imp)
+cat("Impression-to-Purchase Rate:", impression_to_purchase_rate)
+```
+
+2.  Randomization check: Here, we use t.test to understand if test and
+    control groups are randomly given treatment by assessing whether
+    total_imp varies across 2 groups. #small p-value = different H0 =
+    not difference in total impression between test and control group;
+    H1 = there's difference of total impression between test and control
+    group)
+
+```{r}
+t.test(total_imp ~ test, star)
+```
+
+From t.test result, we report p-value 0.8987, which is quite high,
+indicating that there is not enough evidence to reject the null
+hypothesis. In other words, based on the data and the statistical test
+performed, it does not appear that there is a significant difference in
+the "total_imp" between control and test group
+
+We conducted a randomization check to impression on Site 1 through 5 as
+well as on Site 6. We can also conclude that there is no significant
+differences between the number of impressions for these 2 grouped Sites
+between the control and test group.
+
+```{r}
+# sum total impression on Site 1 through 6
+star = star %>% mutate(site15_imp = imp_1+imp_2+imp_3+imp_4+imp_5)
+t.test(site15_imp ~ test, star)
+```
+
+```{r}
+t.test(imp_6 ~ test, star)
+```
+
+3.  Sample Size check:
+
+```{r}
+power.t.test(delta=.1, sd = 1, sig.level = .05, power = 0.8, type = "two.sample",alternative = "two.sided")
+```
+Alternative way to find d with given n
+```{r}
+power.t.test(d=NULL, n = 2656, sd = 1, sig.level = .05, power = 0.8, type = "two.sample",alternative = "two.sided")
+```
+
+Given the management team's goal of boosting the purchase conversion
+rate by 1% with the intervention, we set the delta as 0.1, and the
+minimum sample size for control and test group should be around 1570. We
+have a big enough sample size for both groups.
+
+**`Question 1 - Is online advertising effective for Star Digital?`**
+
+```{r}
+summary(lm(purchase ~ test, star))
+```
+
+From the above regression, we can obtain the p-value for 'test' as
+0.0614, greater than the acceptable significance level of 0.05. This
+indicates that we do not have enough evidence to reject the null
+hypothesis: the experiment of displaying Star Digital ads to the test
+group has no effect on their purchase behavior. We should also note that
+the sample data set was deliberately chosen, we should not arbitrarily
+conclude that the ad display experiment is useless.
+
+Although we did not have sufficient evidence to support the experiment's
+effectiveness, we did observe a positive correlations between the test
+group and the average number of purchases increase by 1.91%.
+
+**`Question 2 - Whether increasing frequency of advertising increases the probability of purchase?`**
+
+To answer this question, we would first inspect the impression frequency
+of test and control group.
+
+```{r}
+summary(lm(purchase ~ test*total_imp, data = star))
+```
+
+To discuss the effectiveness of impression frequency on the probability
+of purchase, we can refer to the p-value of the total impression and the
+interaction of the test and total impression. Both of them demonstrate
+very small p-values, much lower than the significant level 0.05: .3.49e
+-10 for total impression, and 0.0188 for the interaction of total
+impression and test.
+
+This indicates that we have enough evidence to reject the null
+hypothesis, in other words, the total impression number does effects
+number of purchases.
+
+The output also provides insight into how purchase event changes for a
+one unit increase of impression. A one unit increase in 'total_imp' is
+associated with an estimated increase of approximately 0.0025937 in the
+purchase. Furthermore, given the positive interaction effect of total
+impression and the test, we can know that for the test group as total
+impression increase, the purchase increases simultaneously.
+
+**`Question 3 - Which site should Star Digital advertise on? (Site 6 or in Site 1 through 5)`**
+
+Here we present a short summary table of the number of users, purchases,
+impression on Site 6 or on Site 1 through 5 in order to get a clearer
+sense of the total ROI for both the test and control groups.
+
+```{r}
+star %>% group_by(test) %>% summarize(count_users = n(), 
+                                      total_purchase = sum(purchase),
+                                      total_imp = sum(total_imp), 
+                                      total_6imp = sum(imp_6),
+                                      total_15imp = sum(site15_imp),
+                                      cost = (25*(total_15imp/1000)+
+                                                20*(total_6imp/1000)),
+                                      revenue = (1200*total_purchase),
+                                      ROI = ((revenue-cost) / cost))
+```
+
+For this question, we will only like to see the correlation of the
+impressions with purchases for the testing group. We will filter this
+subset of data, and focus on observing the difference in effectiveness
+between impressions on Site 1 through 5 versus impression on Site 6.
+
+```{r}
+star_test = star %>% filter(test == 1) %>% mutate(site15_imp = imp_1+imp_2+imp_3+imp_4+imp_5)
+```
+
+Next, we run an model to test the correlation between the total
+impression on Site 1 through 5 and purchases. The result of this model
+shows a statistical significance of a positive correlation where
+purchases increase around 0.0039 with one unit increase of impression on
+Site 1 through 5.
+
+```{r}
+summary(lm(purchase ~ site15_imp, data = star_test))
+```
+
+We did the same analysis to observe the correlation between the total
+impression on Site 6 and purchases. The result shows a statistical
+significance of a positive correlation where purchases increase around
+0.0037 with one unit increase of impression on Site 6.
+
+```{r}
+summary(lm(purchase ~ imp_6, data = star_test))
+```
+
+Here is a tabular summary of how impression of both Site 1 through 5
+versus Site 6 has on ROI taking into account the unit price per
+impression as well as the expected revenue increase in dollar amount. In
+summary, we would recommend Star Digital advertise more on Site 6 than
+on Site 1 through 5, due to a higher expected ROI yield.
+
+```{r}
+table = data.frame(
+  Site = c("Site_1-5", "Site_6"),
+  Revenue_per_impression_increase = c("0.0038981*$1200 = $4.67", "0.0036950*$1200 = $4.43"),
+  Cost_per_impression = c("$0.025", "$0.020"),
+  ROI_per_impression_increase = c("185.8","220.5")
+)
+print(table)
+```
